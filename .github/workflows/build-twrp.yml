@@ -45,7 +45,7 @@ jobs:
           cd ~/twrp
           export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
-          lunch omni_TECNO-LC7-eng
+          lunch omni_TECNO-LC7-userdebug
           mka recoveryimage -j$(nproc --all)
 
       - name: Upload recovery.img artifact
