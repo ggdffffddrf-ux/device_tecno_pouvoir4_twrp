@@ -1,0 +1,55 @@
+name: Build TWRP for TECNO-LC7
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/* /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          docker system prune -af || true
+          df -h
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32readline-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 python3-pip git-lfs bc ccache
+
+      - name: Setup repo and minimal TWRP manifest
+        run: |
+          mkdir -p ~/bin ~/twrp
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          export PATH=~/bin:$PATH
+          cd ~/twrp
+          repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-11
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+      - name: Checkout TECNO-LC7 device tree
+        run: |
+          cd ~/twrp
+          rm -rf device/tecno/TECNO-LC7
+          mkdir -p device/tecno/TECNO-LC7
+          git clone --depth=1 https://github.com/ggdffffddrf-ux/device_tecno_pouvoir4_twrp.git /tmp/dt_repo
+          cp -r /tmp/dt_repo/tecno/TECNO-LC7/. device/tecno/TECNO-LC7/
+          rm -rf device/tecno/TECNO-LC7/tecno
+          ls -la device/tecno/TECNO-LC7
+
+      - name: Build recovery image
+        run: |
+          cd ~/twrp
+          export ALLOW_MISSING_DEPENDENCIES=true
+          source build/envsetup.sh
+          lunch omni_TECNO-LC7-eng
+          mka recoveryimage -j$(nproc --all)
+
+      - name: Upload recovery.img artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: twrp-recovery-img
+          path: ~/twrp/out/target/product/TECNO-LC7/recovery.img
